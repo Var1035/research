@@ -40,7 +40,7 @@ if st.button("Summarize"):
 # Additional features (e.g., error handling) can be added as needed
 
 # Footer
-st.write("Powered by LangChain and deployed on AWS")
+st.write("Created by varu1035")
 
 # Link to the deployed app
 st.write("Explore the live app here")
