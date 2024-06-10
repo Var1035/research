@@ -1,79 +1,46 @@
-import streamlit as st 
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.document_loaders import PyPDFLoader, DirectoryLoader
-from langchain.chains.summarize import load_summarize_chain
-from transformers import T5Tokenizer, T5ForConditionalGeneration
+# Import necessary libraries
+import streamlit as st
 from transformers import pipeline
-import torch
-import base64
+import fitz  # PyMuPDF for PDF handling
 
-#model and tokenizer loading
-checkpoint = "LaMini-Flan-T5-248M"
-tokenizer = T5Tokenizer.from_pretrained(checkpoint)
-base_model = T5ForConditionalGeneration.from_pretrained(checkpoint, device_map='auto', torch_dtype=torch.float32)
+# Load the summarization model (e.g., BERT, GPT, T5)
+summarizer = pipeline("summarization")
 
-#file loader and preprocessing
-def file_preprocessing(file):
-    loader =  PyPDFLoader(file)
-    pages = loader.load_and_split()
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=200, chunk_overlap=50)
-    texts = text_splitter.split_documents(pages)
-    final_texts = ""
-    for text in texts:
-        print(text)
-        final_texts = final_texts + text.page_content
-    return final_texts
+# Streamlit app layout
+st.title("Research Paper Summarizer")
+st.write("Elevate your research experience with our text summarization tool!")
 
-#LLM pipeline
-def llm_pipeline(filepath):
-    pipe_sum = pipeline(
-        'summarization',
-        model = base_model,
-        tokenizer = tokenizer,
-        max_length = 500, 
-        min_length = 50)
-    input_text = file_preprocessing(filepath)
-    result = pipe_sum(input_text)
-    result = result[0]['summary_text']
-    return result
+# User input: Text area for input
+user_input = st.text_area("Enter your research paper or article:", height=200)
 
-@st.cache_data
-#function to display the PDF of a given file 
-def displayPDF(file):
-    # Opening file from file path
-    with open(file, "rb") as f:
-        base64_pdf = base64.b64encode(f.read()).decode('utf-8')
+# PDF upload
+pdf_file = st.file_uploader("Upload a PDF file", type=["pdf"])
 
-    # Embedding PDF in HTML
-    pdf_display = F'<iframe src="data:application/pdf;base64,{base64_pdf}" width="100%" height="600" type="application/pdf"></iframe>'
+# Summarize button
+if st.button("Summarize"):
+    if user_input:
+        # Generate summary from text input
+        summary = summarizer(user_input, max_length=150, min_length=30, do_sample=False)
+        st.write("Summary:")
+        st.write(summary[0]["summary_text"])
+    elif pdf_file:
+        # Extract text from uploaded PDF
+        pdf_doc = fitz.open(stream=pdf_file.read(), filetype="pdf")
+        pdf_text = ""
+        for page in pdf_doc:
+            pdf_text += page.get_text()
 
-    # Displaying File
-    st.markdown(pdf_display, unsafe_allow_html=True)
+        # Generate summary from extracted PDF text
+        summary = summarizer(pdf_text, max_length=150, min_length=30, do_sample=False)
+        st.write("Summary from PDF:")
+        st.write(summary[0]["summary_text"])
+    else:
+        st.warning("Please enter some text or upload a PDF to summarize.")
 
-#streamlit code 
-st.set_page_config(layout="wide")
+# Additional features (e.g., error handling) can be added as needed
 
-def main():
-    st.title("Document Summarization App using Langauge Model")
+# Footer
+st.write("Powered by LangChain and deployed on AWS")
 
-    uploaded_file = st.file_uploader("Upload your PDF file", type=['pdf'])
-
-    if uploaded_file is not None:
-        if st.button("Summarize"):
-            col1, col2 = st.columns(2)
-            filepath = "data/"+uploaded_file.name
-            with open(filepath, "wb") as temp_file:
-                temp_file.write(uploaded_file.read())
-            with col1:
-                st.info("Uploaded File")
-                pdf_view = displayPDF(filepath)
-
-            with col2:
-                summary = llm_pipeline(filepath)
-                st.info("Summarization Complete")
-                st.success(summary)
-
-
-
-if __name__ == "__main__":
-    main()
+# Link to the deployed app
+st.write("Explore the live app here")
